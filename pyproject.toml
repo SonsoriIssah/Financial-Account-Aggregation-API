@@ -1,0 +1,31 @@
+[project]
+name = "financial-account-aggregation-api"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "SonsoriIssah", email = "issonsori@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.19.1",
+    "fastapi>=0.141.1",
+    "passlib[bcrypt]>=1.7.4",
+    "psycopg2-binary>=2.9.12",
+    "pydantic-settings>=2.15.0",
+    "python-jose[cryptography]>=3.5.0",
+    "sqlalchemy>=2.0.52",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.scripts]
+financial-account-aggregation-api = "financial_account_aggregation_api:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
