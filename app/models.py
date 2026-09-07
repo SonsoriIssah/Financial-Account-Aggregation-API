@@ -1,5 +1,5 @@
 from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy import  ForeignKey,Enum
+from sqlalchemy import  ForeignKey,Enum,UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 import uuid, enum
 from .database import Base
@@ -48,6 +48,9 @@ class Account(Base):
 
 class Transaction(Base):
     __tablename__ = 'transactions'
+    __table_args__ = (
+        UniqueConstraint('account_id', 'provider_transaction_id', name='uq_transactions_account_id_provider_transaction_id'),
+    )
     id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id:Mapped[uuid.UUID]= mapped_column(ForeignKey('accounts.id'),nullable=False, index=True)
     provider_transaction_id:Mapped[str] = mapped_column(nullable=False)
