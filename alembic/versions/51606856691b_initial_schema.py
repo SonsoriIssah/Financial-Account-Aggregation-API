@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 5a5601e6f983
+Revision ID: 51606856691b
 Revises: 
-Create Date: 2026-09-07 18:07:03.965501
+Create Date: 2026-09-10 12:28:54.009758
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '5a5601e6f983'
+revision: str = '51606856691b'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,8 +25,9 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('hashed_password', sa.String(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('email')
     )
     op.create_table('linked_accounts',
     sa.Column('id', sa.UUID(), nullable=False),
@@ -34,10 +35,10 @@ def upgrade() -> None:
     sa.Column('provider_item_id', sa.String(), nullable=False),
     sa.Column('institution_name', sa.String(), nullable=False),
     sa.Column('access_token', sa.String(), nullable=False),
-    sa.Column('status', sa.Enum('ACTIVE', 'NEEDS_REAUTH', 'ERROR', 'DISABLED', name='linkedaccountstatus'), nullable=False),
-    sa.Column('last_synced_at', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.Column('status', sa.Enum('active', 'needs_reauth', 'error', 'disabled', name='linkedaccountstatus'), nullable=False),
+    sa.Column('last_synced_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_linked_accounts_user_id'), 'linked_accounts', ['user_id'], unique=False)
@@ -45,24 +46,24 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('linked_account_id', sa.UUID(), nullable=False),
     sa.Column('provider_account_id', sa.String(), nullable=False),
-    sa.Column('account_type', sa.Enum('CHECKING', 'SAVINGS', 'CREDIT', name='accounttype'), nullable=False),
+    sa.Column('account_type', sa.Enum('checking', 'savings', 'credit', name='accounttype'), nullable=False),
     sa.Column('account_name', sa.String(), nullable=False),
     sa.Column('current_balance', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('available_balance', sa.Numeric(precision=12, scale=2), nullable=True),
     sa.Column('currency', sa.String(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['linked_account_id'], ['linked_accounts.id'], ),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['linked_account_id'], ['linked_accounts.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_accounts_linked_account_id'), 'accounts', ['linked_account_id'], unique=False)
     op.create_table('sync_jobs',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('linked_account_id', sa.UUID(), nullable=False),
-    sa.Column('status', sa.Enum('QUEUED', 'IN_PROGRESS', 'SUCCESS', 'FAILED', name='syncjobsstatus'), nullable=False),
+    sa.Column('status', sa.Enum('queued', 'in_progress', 'success', 'failed', name='syncjobstatus'), nullable=False),
     sa.Column('error_message', sa.String(), nullable=True),
-    sa.Column('started_at', sa.DateTime(), nullable=False),
-    sa.Column('finished_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['linked_account_id'], ['linked_accounts.id'], ),
+    sa.Column('started_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['linked_account_id'], ['linked_accounts.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_sync_jobs_linked_account_id'), 'sync_jobs', ['linked_account_id'], unique=False)
@@ -74,10 +75,11 @@ def upgrade() -> None:
     sa.Column('currency', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=False),
     sa.Column('category', sa.String(), nullable=True),
-    sa.Column('posted_at', sa.DateTime(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('posted_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('account_id', 'provider_transaction_id', name='uq_transactions_account_id_provider_transaction_id')
     )
     op.create_index(op.f('ix_transactions_account_id'), 'transactions', ['account_id'], unique=False)
     # ### end Alembic commands ###
@@ -96,3 +98,9 @@ def downgrade() -> None:
     op.drop_table('linked_accounts')
     op.drop_table('users')
     # ### end Alembic commands ###
+    # Drop the enum types that create_table auto-created (Postgres leaves them
+    # behind on drop_table).
+    bind = op.get_bind()
+    sa.Enum(name='syncjobstatus').drop(bind, checkfirst=True)
+    sa.Enum(name='accounttype').drop(bind, checkfirst=True)
+    sa.Enum(name='linkedaccountstatus').drop(bind, checkfirst=True)
