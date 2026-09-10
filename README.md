@@ -68,15 +68,18 @@ All routes require a bearer token except `/auth/*` and `/health`.
 
 ## Providers
 
-`PROVIDER` selects the aggregator (`app/providers/`):
+Each linked connection records which aggregator it uses (`linked_accounts.provider`),
+so **Plaid and demo banks can coexist**. Implementations live in `app/providers/`.
 
-- **`mock`** (default) — the local fake bank service on `:9000`
-- **`plaid`** — Plaid sandbox or production. Set `PLAID_CLIENT_ID`, `PLAID_SECRET`,
-  `PLAID_ENV`, `PLAID_COUNTRY_CODES`. The frontend reads `GET /config` and shows the
-  Plaid Link widget instead of the mock bank picker.
+- **demo banks** — [`mockbank/`](mockbank/), a standalone service (5 Ghanaian banks +
+  a slow and a flaky one) whose ledgers grow on a timer, so syncs keep pulling fresh
+  data. `GET /providers/demo-banks` lists them; the link modal offers them directly.
+- **Plaid** — set `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_COUNTRY_CODES`.
+  When configured, the link modal also offers "Connect a real bank (Plaid)".
 
-Provider access tokens are encrypted at rest with Fernet (`ENCRYPTION_KEY`); the
-built-in default is dev-only.
+`PROVIDER` is only the default for a link that doesn't specify one. Provider access
+tokens are encrypted at rest with Fernet (`ENCRYPTION_KEY`); the built-in default is
+dev-only.
 
 ## Resilience
 
