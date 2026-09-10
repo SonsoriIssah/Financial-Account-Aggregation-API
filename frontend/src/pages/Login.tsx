@@ -11,13 +11,14 @@ const POINTS = [
 ];
 
 export function Login() {
-  const { login, register } = useAuth();
+  const { login, register, useTestAccount } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [guestBusy, setGuestBusy] = useState(false);
 
   const isRegister = mode === "register";
 
@@ -36,6 +37,18 @@ export function Login() {
       setError(err instanceof ApiError ? err.detail : "Something went wrong");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onGuest() {
+    setError(null);
+    setGuestBusy(true);
+    try {
+      await useTestAccount();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Couldn't create a test account");
+    } finally {
+      setGuestBusy(false);
     }
   }
 
@@ -78,81 +91,103 @@ export function Login() {
 
       {/* auth card */}
       <div className="flex items-center justify-center p-margin-mobile">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-space-sm justify-center mb-space-xl">
-            <span className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary">
-              <Icon name="account_balance_wallet" className="text-[22px]" />
+        <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest shadow-sm p-space-xl">
+          <div className="flex flex-col items-center text-center gap-space-2xs mb-space-lg">
+            <span className="w-11 h-11 rounded-xl bg-primary-container flex items-center justify-center text-on-primary mb-space-xs">
+              <Icon name="account_balance_wallet" className="text-[24px]" />
             </span>
-            <span className="text-headline-md font-bold tracking-tight">
+            <h1 className="text-headline-md font-bold tracking-tight">
               Kudi<span className="text-primary-container">Vault</span>
-            </span>
+            </h1>
+            <p className="text-body-sm text-on-surface-variant">
+              A bank account aggregator, built from scratch.
+            </p>
           </div>
 
-          <div className="rounded-2xl bg-surface-container-lowest shadow-sm p-space-xl">
-            <h1 className="text-headline-sm font-semibold">
-              {isRegister ? "Create your account" : "Sign in"}
-            </h1>
-            <p className="text-body-sm text-on-surface-variant mt-space-2xs">
-              {isRegister
-                ? "One account to see every linked bank in one place."
-                : "Welcome back. Sign in to your dashboard."}
-            </p>
+          {/* one-click test account */}
+          <button
+            onClick={onGuest}
+            disabled={guestBusy}
+            className="w-full h-12 rounded-xl bg-inverse-surface text-inverse-on-surface font-semibold text-label-md flex items-center justify-center gap-space-xs hover:opacity-95 active:scale-[0.99] transition disabled:opacity-60"
+          >
+            {guestBusy ? (
+              <Icon name="progress_activity" className="animate-spin text-[20px]" />
+            ) : (
+              <Icon name="bolt" className="text-[20px]" />
+            )}
+            Use a test account
+          </button>
+          <p className="text-caption text-on-surface-variant text-center mt-space-xs">
+            One click, no details needed. Creates a fresh account and signs you in — then link a
+            demo bank.
+          </p>
 
-            <form onSubmit={onSubmit} className="flex flex-col gap-space-md mt-space-lg">
-              <Field
-                label="Email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-              <Field
-                label="Password"
-                type="password"
-                autoComplete={isRegister ? "new-password" : "current-password"}
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-              {isRegister && (
-                <Field
-                  label="Confirm password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="••••••••"
-                />
-              )}
-              {error && (
-                <div className="text-body-sm text-error bg-error-container/40 rounded-xl px-space-md py-space-xs">
-                  {error}
-                </div>
-              )}
-              <Button type="submit" loading={busy} className="w-full">
-                {isRegister ? "Create account" : "Sign in"}
-              </Button>
-            </form>
+          <div className="flex items-center gap-space-sm my-space-lg text-on-surface-variant">
+            <span className="h-px flex-1 bg-surface-container" />
+            <span className="text-label-sm uppercase tracking-wider">Or use email</span>
+            <span className="h-px flex-1 bg-surface-container" />
+          </div>
 
-            <p className="text-body-sm text-on-surface-variant text-center mt-space-lg">
-              {isRegister ? "Already have an account?" : "New here?"}{" "}
+          {/* login / register tabs */}
+          <div className="flex border-b border-surface-container">
+            {(["login", "register"] as const).map((m) => (
               <button
-                type="button"
-                className="text-primary font-semibold"
+                key={m}
                 onClick={() => {
-                  setMode(isRegister ? "login" : "register");
+                  setMode(m);
                   setError(null);
                 }}
+                className={`flex-1 pb-space-xs text-label-md font-semibold -mb-px border-b-2 transition-colors ${
+                  mode === m
+                    ? "border-primary text-on-surface"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface"
+                }`}
               >
-                {isRegister ? "Sign in" : "Create account"}
+                {m === "login" ? "Log in" : "Create account"}
               </button>
-            </p>
+            ))}
           </div>
+
+          <form onSubmit={onSubmit} className="flex flex-col gap-space-md mt-space-lg">
+            <Field
+              label="Email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+            <Field
+              label="Password"
+              type="password"
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+            {isRegister && (
+              <Field
+                label="Confirm password"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="••••••••"
+              />
+            )}
+            {error && (
+              <div className="text-body-sm text-error bg-error-container/40 rounded-xl px-space-md py-space-xs">
+                {error}
+              </div>
+            )}
+            <Button type="submit" loading={busy} icon="arrow_forward" className="w-full flex-row-reverse">
+              {isRegister ? "Create account" : "Log in"}
+            </Button>
+          </form>
         </div>
       </div>
     </div>

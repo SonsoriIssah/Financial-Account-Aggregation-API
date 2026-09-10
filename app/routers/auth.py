@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import Depends,HTTPException,APIRouter
 from app.models import User
 from app.schemas import UserRegister, UserLogin,RefreshRequest, UserOut
@@ -59,6 +61,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_d
 @router.get('/me', response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.post('/test-account')
+async def test_account(db=Depends(get_db)):
+    """One-click throwaway account — creates a fresh user and returns tokens.
+
+    For recruiters / demos: no email or password to type. The account starts
+    empty; link a demo bank from the dashboard.
+    """
+    email = f'guest-{secrets.token_hex(6)}@example.com'
+    password = secrets.token_urlsafe(24)
+    user = User(email=email, hashed_password=hash_password(password))
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return {
+        'access_token': create_access_token({'sub': email}),
+        'refresh_token': create_refresh_token({'sub': email}),
+        'email': email,
+    }
 
 
 @router.post('/refresh')
