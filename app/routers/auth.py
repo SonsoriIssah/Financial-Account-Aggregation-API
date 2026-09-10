@@ -1,4 +1,4 @@
-from fastapi import Depends,HTTPException
+from fastapi import Depends,HTTPException,APIRouter
 from app.models import User
 from app.schemas import UserRegister, UserLogin,RefreshRequest
 from app.auth import hash_password, verify_password,create_access_token,create_refresh_token,decode_and_verify_type
@@ -6,10 +6,11 @@ from app.database import get_db
 from sqlalchemy import select
 from fastapi.security import OAuth2PasswordBearer
 from jose import  JWTError
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='login')
-from app.main import app
 
-@app.post('/auth/register')
+router = APIRouter()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/login')
+
+@router.post('/register')
 async def register(user: UserRegister, db=Depends(get_db)):
     password = hash_password(user.password)
     db_user = User(email=user.email, hashed_password=password)
@@ -21,7 +22,7 @@ async def register(user: UserRegister, db=Depends(get_db)):
         'email': db_user.email,
     }
 
-@app.post('/auth/login')
+@router.post('/login')
 async def login(user: UserLogin, db=Depends(get_db)):
     query = await db.execute(select(User).where(User.email==user.email))
     db_user = query.scalars().first()
@@ -47,7 +48,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_d
         raise HTTPException(status_code=401, detail='Could not validate credentials')
     return user
 
-@app.post('/refresh')
+@router.post('/refresh')
 async def refresh(token: RefreshRequest, db=Depends(get_db)):
     try:
         payload = decode_and_verify_type(token.refresh_token,'refresh')
