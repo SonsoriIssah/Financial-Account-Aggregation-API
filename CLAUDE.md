@@ -36,17 +36,23 @@ code, they write it themselves.
 
 ## Build phases (owner-paced)
 
-1. Foundations — FastAPI structure, Postgres, core tables, JWT auth. *(in progress)*
-2. Mock provider — 2–3 fake banks with quirks (slow, ~10% errors, different shape).
-3. Linking + synchronous sync (no Kafka yet) — get normalize-and-store correct first.
-4. Resilience — retry/backoff, Redis rate limiter, `needs_reauth`. The heart of the project.
-5. Background processing — Kafka topic, standalone worker, scheduler.
+1. Foundations — FastAPI structure, Postgres, core tables, JWT auth. *(done)*
+2. Mock provider — fake banks with quirks (bank-a normal, bank-b flaky 503, bank-c slow). *(done)*
+3. Linking + synchronous sync (no Kafka yet) — normalize-and-store, dedup, account endpoints. *(done)*
+4. Resilience — retry/backoff, Redis token-bucket rate limiter, `needs_reauth`, failure tests. *(done)*
+5. Background processing — Kafka topic, standalone worker, scheduler. *(next)*
 6. Polish + metrics — sync-status endpoint, structured logging, load/chaos test.
 
 ## Conventions
 
 - Alembic migrations are the only way schema changes reach the DB. Every model change
   gets a migration; never edit the database directly.
-- Access tokens from the provider are encrypted at rest (Fernet, key from env).
+- Access tokens from the provider are encrypted at rest (Fernet, key from env). *(still a TODO — stored plaintext)*
 - `.env` holds real secrets and must never be committed — keep `.env.example` current instead.
 - All async: async SQLAlchemy engine/sessions, async route handlers.
+- Infra via `docker compose up -d` (Postgres + Redis). Redis backs the rate limiters;
+  they fail open if it's down. Tests need both plus the mock provider on :9000, and use
+  a separate `finaggapi_test` database (`uv run pytest`).
+- Provider calls go through `app.provider._get`: per-provider token bucket + retry with
+  exponential backoff. Auth errors (401/403) are never retried and flip the link to
+  `needs_reauth`.

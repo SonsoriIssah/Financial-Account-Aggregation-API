@@ -38,6 +38,7 @@ from app.provider import (
     fetch_transactions,
     normalize_transaction,
 )
+from app.ratelimit import RateLimited
 
 
 def _now() -> datetime:
@@ -55,20 +56,25 @@ async def sync_linked_account(db: AsyncSession, linked_account: LinkedAccount) -
     db.add(job)
     await db.flush()
 
-    # 1. pull from the provider
+    # 1. pull from the provider (retry/backoff and the outbound token bucket
+    #    live in app.provider)
     try:
         slug = _bank_slug(linked_account)
         provider_accounts = await fetch_accounts(slug)
         provider_txns = await fetch_transactions(slug)
-    except ProviderError as exc:
+    except (ProviderError, RateLimited) as exc:
         job.status = SyncJobStatus.FAILED
         job.error_message = str(exc)[:1000]
         job.finished_at = _now()
-        if exc.is_auth_error:
+        rate_limited = isinstance(exc, RateLimited)
+        if isinstance(exc, ProviderError) and exc.is_auth_error:
+            # permanent until the user re-links; stop syncing this account
             linked_account.status = LinkedAccountStatus.NEEDS_REAUTH
         await db.commit()
         await db.refresh(job)
         job.transactions_synced = 0
+        job.rate_limited = rate_limited
+        job.retry_after = getattr(exc, "retry_after", None)
         return job
 
     # 2. refresh cached balances

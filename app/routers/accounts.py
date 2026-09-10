@@ -1,13 +1,17 @@
 from datetime import date, datetime, time, timedelta, timezone
+from math import ceil
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models import Account, LinkedAccount, LinkedAccountStatus, AccountType, Transaction, User
 from app.provider import ProviderError, fetch_accounts
+from app.ratelimit import RateLimited, enforce_user_limit
+from app.redis_client import get_redis
 from app.routers.auth import get_current_user
 from app.schemas import (
     AccountOut,
@@ -21,6 +25,15 @@ from app.schemas import (
     TransactionPage,
 )
 from app.sync import sync_linked_account
+
+
+def _too_many_requests(retry_after: float | None) -> HTTPException:
+    seconds = ceil(retry_after) if retry_after else 60
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="rate limit reached, retry later",
+        headers={"Retry-After": str(seconds)},
+    )
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -59,6 +72,8 @@ async def complete_link(
 ):
     try:
         provider_accounts = await fetch_accounts(body.bank_slug)
+    except RateLimited as exc:
+        raise _too_many_requests(exc.retry_after)
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     if not provider_accounts:
@@ -67,17 +82,42 @@ async def complete_link(
             detail=f"provider returned no accounts for {body.bank_slug!r}",
         )
 
-    linked = LinkedAccount(
-        user_id=current_user.id,
-        provider_item_id=f"mock-{body.bank_slug}",
-        institution_name=body.institution_name,
-        access_token="mock-token-not-real",  # TODO(phase 3): real token, encrypted at rest
-        status=LinkedAccountStatus.ACTIVE,
-    )
-    db.add(linked)
-    await db.flush()
+    provider_item_id = f"mock-{body.bank_slug}"
+    linked = (
+        await db.execute(
+            select(LinkedAccount).where(
+                LinkedAccount.user_id == current_user.id,
+                LinkedAccount.provider_item_id == provider_item_id,
+            )
+        )
+    ).scalars().first()
 
+    if linked is None:
+        linked = LinkedAccount(
+            user_id=current_user.id,
+            provider_item_id=provider_item_id,
+            institution_name=body.institution_name,
+            access_token="mock-token-not-real",  # TODO: real token, encrypted at rest
+            status=LinkedAccountStatus.ACTIVE,
+        )
+        db.add(linked)
+        await db.flush()
+    else:
+        # re-linking an existing connection (e.g. after needs_reauth)
+        linked.institution_name = body.institution_name
+        linked.status = LinkedAccountStatus.ACTIVE
+
+    existing_provider_ids = {
+        a.provider_account_id
+        for a in (
+            await db.execute(
+                select(Account).where(Account.linked_account_id == linked.id)
+            )
+        ).scalars()
+    }
     for pa in provider_accounts:
+        if pa.account_id in existing_provider_ids:
+            continue
         db.add(
             Account(
                 linked_account_id=linked.id,
@@ -187,6 +227,13 @@ async def sync_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    try:
+        await enforce_user_limit(
+            get_redis(), "sync", current_user.id, limit=settings.api_rate_limit_per_minute
+        )
+    except RateLimited as exc:
+        raise _too_many_requests(exc.retry_after)
+
     account = await _get_owned_account(account_id, current_user, db)
     linked = await db.get(LinkedAccount, account.linked_account_id)
     if linked.status == LinkedAccountStatus.NEEDS_REAUTH:
@@ -196,6 +243,10 @@ async def sync_account(
         )
 
     job = await sync_linked_account(db, linked)
+    if getattr(job, "rate_limited", False):
+        # provider token bucket was empty — the job is recorded as failed and
+        # the client is told to back off (a real queue would delay + requeue).
+        raise _too_many_requests(getattr(job, "retry_after", None))
     return SyncResultOut.from_job(job, getattr(job, "transactions_synced", 0))
 
 

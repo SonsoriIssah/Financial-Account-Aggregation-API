@@ -11,13 +11,19 @@ During development this talks to the local mock provider (see
 both are fixed up in :func:`normalize_transaction`.
 """
 
+import asyncio
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
 import httpx
 
 from app.config import settings
+from app.ratelimit import take_provider_token
+from app.redis_client import get_redis
 from app.schemas import ProviderAccount, ProviderTransaction
+
+log = logging.getLogger(__name__)
 
 
 class ProviderError(RuntimeError):
@@ -36,8 +42,19 @@ class ProviderError(RuntimeError):
     def is_auth_error(self) -> bool:
         return self.status_code in (401, 403)
 
+    @property
+    def is_retryable(self) -> bool:
+        # network/timeout errors have no status; 5xx are transient; 4xx are not
+        return self.status_code is None or self.status_code >= 500
 
-async def _get(path: str) -> list[dict]:
+
+def _backoff_delay(attempt: int) -> float:
+    """Seconds to wait before ``attempt`` (1-based): 2s, 4s, 8s, ... capped."""
+    delay = settings.provider_backoff_base_seconds * (2 ** (attempt - 2))
+    return min(delay, settings.provider_backoff_max_seconds)
+
+
+async def _request(path: str) -> list[dict]:
     url = f"{settings.mock_provider_base_url}{path}"
     try:
         async with httpx.AsyncClient(timeout=settings.provider_timeout_seconds) as client:
@@ -53,12 +70,43 @@ async def _get(path: str) -> list[dict]:
         raise ProviderError(f"provider request to {path} failed: {exc}") from exc
 
 
+async def _get(path: str, *, provider: str) -> list[dict]:
+    """GET ``path`` with a per-provider token bucket and retry/backoff.
+
+    Raises :class:`RateLimited` if the bucket is empty (no call made) and
+    :class:`ProviderError` if every attempt fails.
+    """
+    last_error: ProviderError | None = None
+    for attempt in range(1, settings.provider_max_attempts + 1):
+        await take_provider_token(
+            get_redis(),
+            provider,
+            capacity=settings.provider_rate_capacity,
+            refill_per_second=settings.provider_rate_refill_per_second,
+        )
+        try:
+            return await _request(path)
+        except ProviderError as exc:
+            last_error = exc
+            if not exc.is_retryable or attempt == settings.provider_max_attempts:
+                raise
+            delay = _backoff_delay(attempt + 1)
+            log.warning(
+                "provider call %s failed (attempt %d/%d): %s — retrying in %.1fs",
+                path, attempt, settings.provider_max_attempts, exc, delay,
+            )
+            await asyncio.sleep(delay)
+    raise last_error  # pragma: no cover - loop always returns or raises
+
+
 async def fetch_accounts(bank_slug: str) -> list[ProviderAccount]:
-    return [ProviderAccount(**row) for row in await _get(f"/{bank_slug}/accounts")]
+    rows = await _get(f"/{bank_slug}/accounts", provider=bank_slug)
+    return [ProviderAccount(**row) for row in rows]
 
 
 async def fetch_transactions(bank_slug: str) -> list[ProviderTransaction]:
-    return [ProviderTransaction(**row) for row in await _get(f"/{bank_slug}/transactions")]
+    rows = await _get(f"/{bank_slug}/transactions", provider=bank_slug)
+    return [ProviderTransaction(**row) for row in rows]
 
 
 def _parse_posted_at(value: str) -> datetime:
