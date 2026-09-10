@@ -23,5 +23,9 @@ class Settings(BaseSettings):
     # Database
     sql_echo: bool = False
 
+    # Aggregator provider (mock service during development)
+    mock_provider_base_url: str = "http://127.0.0.1:9000"
+    provider_timeout_seconds: float = 30.0
+
 
 settings = Settings()
