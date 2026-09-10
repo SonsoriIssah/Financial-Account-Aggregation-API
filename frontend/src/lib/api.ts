@@ -1,8 +1,10 @@
 import type {
   Account,
+  AppConfig,
   AuthTokens,
   Balance,
   LinkCallbackResult,
+  LinkCallbackPayload,
   LinkStart,
   SyncQueued,
   SyncStatus,
@@ -102,6 +104,8 @@ async function request<T>(path: string, opts: Options = {}): Promise<T> {
 }
 
 export const api = {
+  config: () => request<AppConfig>("/config", { auth: false }),
+
   // auth
   register: (email: string, password: string) =>
     request<User>("/auth/register", { method: "POST", body: { email, password }, auth: false }),
@@ -121,9 +125,6 @@ export const api = {
   // linking
   startLink: (institution_name?: string) =>
     request<LinkStart>("/accounts/link", { method: "POST", body: { institution_name } }),
-  completeLink: (link_token: string, bank_slug: string, institution_name: string) =>
-    request<LinkCallbackResult>("/accounts/link/callback", {
-      method: "POST",
-      body: { link_token, bank_slug, institution_name },
-    }),
+  completeLink: (payload: LinkCallbackPayload) =>
+    request<LinkCallbackResult>("/accounts/link/callback", { method: "POST", body: payload }),
 };
