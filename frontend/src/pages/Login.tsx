@@ -4,6 +4,12 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../lib/api";
 import { Button, Field, Icon } from "../components/ui";
 
+const POINTS = [
+  { icon: "account_balance", text: "Link multiple banks through one connection" },
+  { icon: "insights", text: "Balances and transactions in one normalized view" },
+  { icon: "lock", text: "Read-only access — tokens encrypted at rest" },
+];
+
 export function Login() {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -34,81 +40,119 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center px-margin-mobile">
-      <div className="w-full max-w-md">
-        <div className="flex items-center gap-space-sm justify-center mb-space-xl">
+    <div className="min-h-screen bg-surface grid lg:grid-cols-2">
+      {/* brand / value panel */}
+      <div className="hidden lg:flex flex-col justify-between p-margin-desktop bg-surface-container-lowest relative overflow-hidden">
+        <div className="absolute -left-32 -top-32 w-[28rem] h-[28rem] rounded-full bg-primary-container/10 blur-3xl pointer-events-none" />
+        <div className="absolute right-0 bottom-0 w-80 h-80 rounded-full bg-tertiary-fixed/15 blur-2xl pointer-events-none" />
+
+        <div className="relative flex items-center gap-space-sm">
           <span className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary">
             <Icon name="account_balance_wallet" className="text-[22px]" />
           </span>
-          <span className="text-headline-md font-bold tracking-tight">
+          <span className="text-headline-sm font-bold tracking-tight">
             Kudi<span className="text-primary-container">Vault</span>
           </span>
         </div>
 
-        <div className="rounded-2xl bg-surface-container-lowest shadow-sm p-space-xl">
-          <h1 className="text-headline-sm font-semibold">
-            {isRegister ? "Create your account" : "Sign in"}
-          </h1>
-          <p className="text-body-sm text-on-surface-variant mt-space-2xs">
-            {isRegister
-              ? "One account to see every linked bank in one place."
-              : "Welcome back. Sign in to your dashboard."}
-          </p>
+        <div className="relative space-y-space-lg max-w-md">
+          <h2 className="text-headline-lg font-bold tracking-tight">
+            Every bank account, one clear picture.
+          </h2>
+          <ul className="space-y-space-md">
+            {POINTS.map((p) => (
+              <li key={p.text} className="flex items-center gap-space-sm text-body-md text-on-surface-variant">
+                <span className="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+                  <Icon name={p.icon} className="text-[18px]" />
+                </span>
+                {p.text}
+              </li>
+            ))}
+          </ul>
+        </div>
 
-          <form onSubmit={onSubmit} className="flex flex-col gap-space-md mt-space-lg">
-            <Field
-              label="Email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-            />
-            <Field
-              label="Password"
-              type="password"
-              autoComplete={isRegister ? "new-password" : "current-password"}
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-            {isRegister && (
+        <p className="relative text-label-sm text-on-surface-variant">
+          Demo build · sandbox / mock provider data
+        </p>
+      </div>
+
+      {/* auth card */}
+      <div className="flex items-center justify-center p-margin-mobile">
+        <div className="w-full max-w-md">
+          <div className="lg:hidden flex items-center gap-space-sm justify-center mb-space-xl">
+            <span className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary">
+              <Icon name="account_balance_wallet" className="text-[22px]" />
+            </span>
+            <span className="text-headline-md font-bold tracking-tight">
+              Kudi<span className="text-primary-container">Vault</span>
+            </span>
+          </div>
+
+          <div className="rounded-2xl bg-surface-container-lowest shadow-sm p-space-xl">
+            <h1 className="text-headline-sm font-semibold">
+              {isRegister ? "Create your account" : "Sign in"}
+            </h1>
+            <p className="text-body-sm text-on-surface-variant mt-space-2xs">
+              {isRegister
+                ? "One account to see every linked bank in one place."
+                : "Welcome back. Sign in to your dashboard."}
+            </p>
+
+            <form onSubmit={onSubmit} className="flex flex-col gap-space-md mt-space-lg">
               <Field
-                label="Confirm password"
-                type="password"
-                autoComplete="new-password"
+                label="Email"
+                type="email"
+                autoComplete="email"
                 required
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+              <Field
+                label="Password"
+                type="password"
+                autoComplete={isRegister ? "new-password" : "current-password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
               />
-            )}
-            {error && (
-              <div className="text-body-sm text-error bg-error-container/40 rounded-xl px-space-md py-space-xs">
-                {error}
-              </div>
-            )}
-            <Button type="submit" loading={busy} className="w-full">
-              {isRegister ? "Create account" : "Sign in"}
-            </Button>
-          </form>
+              {isRegister && (
+                <Field
+                  label="Confirm password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="••••••••"
+                />
+              )}
+              {error && (
+                <div className="text-body-sm text-error bg-error-container/40 rounded-xl px-space-md py-space-xs">
+                  {error}
+                </div>
+              )}
+              <Button type="submit" loading={busy} className="w-full">
+                {isRegister ? "Create account" : "Sign in"}
+              </Button>
+            </form>
 
-          <p className="text-body-sm text-on-surface-variant text-center mt-space-lg">
-            {isRegister ? "Already have an account?" : "New here?"}{" "}
-            <button
-              type="button"
-              className="text-primary font-semibold"
-              onClick={() => {
-                setMode(isRegister ? "login" : "register");
-                setError(null);
-              }}
-            >
-              {isRegister ? "Sign in" : "Create account"}
-            </button>
-          </p>
+            <p className="text-body-sm text-on-surface-variant text-center mt-space-lg">
+              {isRegister ? "Already have an account?" : "New here?"}{" "}
+              <button
+                type="button"
+                className="text-primary font-semibold"
+                onClick={() => {
+                  setMode(isRegister ? "login" : "register");
+                  setError(null);
+                }}
+              >
+                {isRegister ? "Sign in" : "Create account"}
+              </button>
+            </p>
+          </div>
         </div>
       </div>
     </div>
