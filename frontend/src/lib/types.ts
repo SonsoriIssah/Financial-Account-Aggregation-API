@@ -70,6 +70,16 @@ export interface SyncStatus {
   latest_job: SyncJob | null;
 }
 
+export interface SyncActivityItem {
+  id: string;
+  linked_account_id: string;
+  institution_name: string;
+  status: SyncJobStatus;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
+}
+
 export interface AppConfig {
   provider: "mock" | "plaid";
 }

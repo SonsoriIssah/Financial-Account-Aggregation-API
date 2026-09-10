@@ -187,3 +187,13 @@ class SyncStatusOut(BaseModel):
     account_status: LinkedAccountStatus
     last_synced_at: datetime | None
     latest_job: SyncJobOut | None
+
+
+class SyncActivityItem(BaseModel):
+    id: UUID
+    linked_account_id: UUID
+    institution_name: str
+    status: SyncJobStatus
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None

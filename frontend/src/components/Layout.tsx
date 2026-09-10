@@ -5,6 +5,8 @@ import { Icon } from "./ui";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
+  { to: "/accounts", label: "Accounts", end: true },
+  { to: "/sync-activity", label: "Sync Activity", end: false },
   { to: "/settings", label: "Settings", end: false },
 ];
 
