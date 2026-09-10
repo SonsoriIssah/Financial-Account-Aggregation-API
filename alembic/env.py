@@ -5,7 +5,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.config import settings
 from app.database import Base
-from app.models import User, LinkedAccount, Account, Transaction, Sync_job
+from app.models import User, LinkedAccount, Account, Transaction, SyncJob
 from alembic import context
 
 # this is the Alembic Config object, which provides
