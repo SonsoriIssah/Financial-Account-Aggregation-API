@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
 
+    # CORS — comma-separated list of allowed frontend origins
+    cors_allow_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
     # Aggregator provider (mock service during development)
     mock_provider_base_url: str = "http://127.0.0.1:9000"
     provider_timeout_seconds: float = 30.0

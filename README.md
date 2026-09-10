@@ -42,7 +42,13 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload      # API      → http://localhost:8000/docs
 uv run python -m app.worker               # sync worker
 uv run python -m app.scheduler            # periodic scheduler
+
+cd frontend && npm install && npm run dev # web UI   → http://localhost:5173
 ```
+
+A React + TypeScript client lives in [`frontend/`](frontend/) — dashboard, account
+detail with transactions, the link flow, and settings. The API enables CORS for
+`http://localhost:5173` by default (`CORS_ALLOW_ORIGINS`).
 
 ## API
 

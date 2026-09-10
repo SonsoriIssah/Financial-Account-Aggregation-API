@@ -1,6 +1,6 @@
 from fastapi import Depends,HTTPException,APIRouter
 from app.models import User
-from app.schemas import UserRegister, UserLogin,RefreshRequest
+from app.schemas import UserRegister, UserLogin,RefreshRequest, UserOut
 from app.auth import hash_password, verify_password,create_access_token,create_refresh_token,decode_and_verify_type
 from app.database import get_db
 from sqlalchemy import select
@@ -55,6 +55,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_d
     if not user:
         raise HTTPException(status_code=401, detail='Could not validate credentials')
     return user
+
+@router.get('/me', response_model=UserOut)
+async def me(user: User = Depends(get_current_user)):
+    return user
+
 
 @router.post('/refresh')
 async def refresh(token: RefreshRequest, db=Depends(get_db)):

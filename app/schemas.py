@@ -27,6 +27,13 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: EmailStr
+
+
 # --- shapes returned by the aggregator provider (mock) ----------------------
 
 class ProviderAccount(BaseModel):
@@ -62,8 +69,6 @@ class LinkCallbackRequest(BaseModel):
 # --- client-facing responses ---------------------------------------------------
 
 class AccountOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     linked_account_id: UUID
     provider_account_id: str
@@ -73,6 +78,27 @@ class AccountOut(BaseModel):
     available_balance: Decimal | None
     currency: str
     updated_at: datetime
+    # denormalized from the parent linked account for the client
+    institution_name: str
+    status: LinkedAccountStatus
+    last_synced_at: datetime | None
+
+    @classmethod
+    def from_row(cls, account, linked) -> "AccountOut":
+        return cls(
+            id=account.id,
+            linked_account_id=account.linked_account_id,
+            provider_account_id=account.provider_account_id,
+            account_type=account.account_type,
+            account_name=account.account_name,
+            current_balance=account.current_balance,
+            available_balance=account.available_balance,
+            currency=account.currency,
+            updated_at=account.updated_at,
+            institution_name=linked.institution_name,
+            status=linked.status,
+            last_synced_at=linked.last_synced_at,
+        )
 
 
 class BalanceOut(BaseModel):
