@@ -34,12 +34,8 @@ from app.models import (
     SyncJobStatus,
     Transaction,
 )
-from app.provider import (
-    ProviderError,
-    fetch_accounts,
-    fetch_transactions,
-    normalize_transaction,
-)
+from app.provider import ProviderError, normalize_transaction
+from app.providers import get_provider
 from app.ratelimit import RateLimited
 
 
@@ -48,10 +44,6 @@ log = logging.getLogger("app.sync")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _bank_slug(linked_account: LinkedAccount) -> str:
-    return linked_account.provider_item_id.removeprefix("mock-")
 
 
 def _emit(job: SyncJob, linked_account_id, started: float, synced: int) -> SyncJob:
@@ -79,11 +71,11 @@ async def sync_linked_account(db: AsyncSession, linked_account: LinkedAccount) -
     await db.flush()
 
     # 1. pull from the provider (retry/backoff and the outbound token bucket
-    #    live in app.provider)
+    #    live in app.provider for the mock)
+    provider = get_provider()
     try:
-        slug = _bank_slug(linked_account)
-        provider_accounts = await fetch_accounts(slug)
-        provider_txns = await fetch_transactions(slug)
+        provider_accounts = await provider.fetch_accounts(linked_account)
+        provider_txns = await provider.fetch_transactions(linked_account)
     except (ProviderError, RateLimited) as exc:
         job.status = SyncJobStatus.FAILED
         job.error_message = str(exc)[:1000]

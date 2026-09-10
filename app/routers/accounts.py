@@ -1,12 +1,13 @@
 from datetime import date, datetime, time, timedelta, timezone
 from math import ceil
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.crypto import encrypt
 from app.database import get_db
 from app import kafka_client
 from app.models import (
@@ -18,7 +19,8 @@ from app.models import (
     Transaction,
     User,
 )
-from app.provider import ProviderError, fetch_accounts
+from app.provider import ProviderError
+from app.providers import get_provider
 from app.ratelimit import RateLimited, enforce_user_limit
 from app.redis_client import get_redis
 from app.routers.auth import get_current_user
@@ -49,10 +51,6 @@ def _too_many_requests(retry_after: float | None) -> HTTPException:
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
-# The mock provider has no link-token step, so tokens issued here are not
-# stored or verified — they only mirror the real two-step handshake shape.
-LINK_TOKEN_TTL_SECONDS = 900
-
 
 async def _get_owned_account(
     account_id: UUID, current_user: User, db: AsyncSession
@@ -73,7 +71,11 @@ async def start_link(
     body: LinkStartRequest,
     current_user: User = Depends(get_current_user),
 ):
-    return LinkStartResponse(link_token=str(uuid4()), expires_in=LINK_TOKEN_TTL_SECONDS)
+    try:
+        token = await get_provider().create_link_token(current_user)
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    return LinkStartResponse(link_token=token.link_token, expires_in=token.expires_in)
 
 
 @router.post("/link/callback", response_model=LinkCallbackResponse)
@@ -82,24 +84,21 @@ async def complete_link(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    provider = get_provider()
+
+    # step 2 of the handshake: turn the client's callback into a stored token
     try:
-        provider_accounts = await fetch_accounts(body.bank_slug)
+        item = await provider.exchange(body, current_user)
     except RateLimited as exc:
         raise _too_many_requests(exc.retry_after)
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-    if not provider_accounts:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"provider returned no accounts for {body.bank_slug!r}",
-        )
 
-    provider_item_id = f"mock-{body.bank_slug}"
     linked = (
         await db.execute(
             select(LinkedAccount).where(
                 LinkedAccount.user_id == current_user.id,
-                LinkedAccount.provider_item_id == provider_item_id,
+                LinkedAccount.provider_item_id == item.provider_item_id,
             )
         )
     ).scalars().first()
@@ -107,17 +106,33 @@ async def complete_link(
     if linked is None:
         linked = LinkedAccount(
             user_id=current_user.id,
-            provider_item_id=provider_item_id,
-            institution_name=body.institution_name,
-            access_token="mock-token-not-real",  # TODO: real token, encrypted at rest
+            provider_item_id=item.provider_item_id,
+            institution_name=item.institution_name,
+            access_token=encrypt(item.access_token),
             status=LinkedAccountStatus.ACTIVE,
         )
         db.add(linked)
         await db.flush()
     else:
         # re-linking an existing connection (e.g. after needs_reauth)
-        linked.institution_name = body.institution_name
+        linked.institution_name = item.institution_name
+        linked.access_token = encrypt(item.access_token)
         linked.status = LinkedAccountStatus.ACTIVE
+
+    try:
+        provider_accounts = await provider.fetch_accounts(linked)
+    except RateLimited as exc:
+        await db.rollback()
+        raise _too_many_requests(exc.retry_after)
+    except ProviderError as exc:
+        await db.rollback()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    if not provider_accounts:
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="provider returned no accounts for this connection",
+        )
 
     existing_provider_ids = {
         a.provider_account_id
@@ -135,7 +150,7 @@ async def complete_link(
                 linked_account_id=linked.id,
                 provider_account_id=pa.account_id,
                 account_type=AccountType.CHECKING,
-                account_name=f"{body.institution_name} ({pa.account_id})",
+                account_name=f"{item.institution_name} ({pa.account_id})",
                 current_balance=pa.balance,
                 currency=pa.currency,
             )

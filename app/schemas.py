@@ -61,9 +61,16 @@ class LinkStartResponse(BaseModel):
 
 
 class LinkCallbackRequest(BaseModel):
-    link_token: str
-    bank_slug: str
-    institution_name: str
+    institution_name: str | None = None
+    # mock provider
+    link_token: str | None = None
+    bank_slug: str | None = None
+    # plaid provider
+    public_token: str | None = None
+
+
+class ConfigOut(BaseModel):
+    provider: str
 
 
 # --- client-facing responses ---------------------------------------------------
