@@ -1,8 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
+from app.kafka_client import close_producer
+from app.redis_client import close_redis
 from app.routers import auth, accounts
 
-app = FastAPI(title='Financial Account Aggregation API', version='0.1.0')
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    # the API only produces to Kafka (queuing sync requests); tidy up on exit
+    await close_producer()
+    await close_redis()
+
+
+app = FastAPI(title='Financial Account Aggregation API', version='0.1.0', lifespan=lifespan)
 
 app.include_router(auth.router, prefix='/auth', tags=['auth'])
 app.include_router(accounts.router)

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app import kafka_client
 from app.models import Account, LinkedAccount, LinkedAccountStatus, AccountType, Transaction, User
 from app.provider import ProviderError, fetch_accounts
 from app.ratelimit import RateLimited, enforce_user_limit
@@ -20,6 +21,7 @@ from app.schemas import (
     LinkCallbackResponse,
     LinkStartRequest,
     LinkStartResponse,
+    SyncQueuedOut,
     SyncResultOut,
     TransactionOut,
     TransactionPage,
@@ -221,12 +223,19 @@ async def list_transactions(
     )
 
 
-@router.post("/{account_id}/sync", response_model=SyncResultOut)
+@router.post(
+    "/{account_id}/sync",
+    response_model=SyncQueuedOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def sync_account(
     account_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Queue a sync. A worker picks it up off Kafka; poll GET .../sync-status
+    for the outcome. Returns 202 even if Kafka is briefly down — the scheduler
+    will catch the account on its next pass."""
     try:
         await enforce_user_limit(
             get_redis(), "sync", current_user.id, limit=settings.api_rate_limit_per_minute
@@ -242,12 +251,8 @@ async def sync_account(
             detail="linked account needs re-authentication",
         )
 
-    job = await sync_linked_account(db, linked)
-    if getattr(job, "rate_limited", False):
-        # provider token bucket was empty — the job is recorded as failed and
-        # the client is told to back off (a real queue would delay + requeue).
-        raise _too_many_requests(getattr(job, "retry_after", None))
-    return SyncResultOut.from_job(job, getattr(job, "transactions_synced", 0))
+    queued = await kafka_client.enqueue_sync(linked.id, reason="manual")
+    return SyncQueuedOut(linked_account_id=linked.id, queued=queued)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
