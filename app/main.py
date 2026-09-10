@@ -3,8 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.kafka_client import close_producer
+from app.logging_config import configure_logging
 from app.redis_client import close_redis
 from app.routers import auth, accounts
+
+configure_logging()
 
 
 @asynccontextmanager

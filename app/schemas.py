@@ -135,3 +135,20 @@ class SyncQueuedOut(BaseModel):
     status: str = "queued"
     # False when Kafka was unreachable; the scheduler will still pick it up
     queued: bool = True
+
+
+class SyncJobOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: SyncJobStatus
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class SyncStatusOut(BaseModel):
+    linked_account_id: UUID
+    account_status: LinkedAccountStatus
+    last_synced_at: datetime | None
+    latest_job: SyncJobOut | None

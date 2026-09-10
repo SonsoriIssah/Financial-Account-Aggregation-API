@@ -116,3 +116,29 @@ async def test_worker_runs_sync_and_emits_result(auth_client, run_sync, kafka_ca
     assert v["linked_account_id"] == lid
     assert v["sync_job_id"] == str(job.id)
     assert v["status"] == "success"
+
+
+async def test_sync_status_reports_latest_job(auth_client):
+    lid, acc_id = await _link(auth_client)  # link runs an initial sync
+
+    r = await auth_client.get(f"/accounts/{acc_id}/sync-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["linked_account_id"] == lid
+    assert body["account_status"] == "active"
+    assert body["last_synced_at"] is not None
+    assert body["latest_job"]["status"] == "success"
+
+    # another user can't see it
+    await auth_client.post(
+        "/auth/register", json={"email": "other@example.com", "password": "pw-123456"}
+    )
+    other = (
+        await auth_client.post(
+            "/auth/login", json={"email": "other@example.com", "password": "pw-123456"}
+        )
+    ).json()["access_token"]
+    r = await auth_client.get(
+        f"/accounts/{acc_id}/sync-status", headers={"Authorization": f"Bearer {other}"}
+    )
+    assert r.status_code == 404

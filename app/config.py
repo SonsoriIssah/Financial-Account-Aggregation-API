@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Database
     sql_echo: bool = False
 
+    # Logging
+    log_level: str = "INFO"
+    log_json: bool = True
+
     # Aggregator provider (mock service during development)
     mock_provider_base_url: str = "http://127.0.0.1:9000"
     provider_timeout_seconds: float = 30.0
