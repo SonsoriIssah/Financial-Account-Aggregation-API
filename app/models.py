@@ -108,3 +108,4 @@ class SyncJob(Base):
     error_message: Mapped[str | None] = mapped_column(nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
