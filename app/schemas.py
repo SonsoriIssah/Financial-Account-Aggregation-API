@@ -52,6 +52,7 @@ class ProviderTransaction(BaseModel):
 # --- linking ---------------------------------------------------------------
 
 class LinkStartRequest(BaseModel):
+    provider: str = "mock"
     institution_name: str | None = None
 
 
@@ -61,6 +62,7 @@ class LinkStartResponse(BaseModel):
 
 
 class LinkCallbackRequest(BaseModel):
+    provider: str | None = None
     institution_name: str | None = None
     # mock provider
     link_token: str | None = None
@@ -69,8 +71,16 @@ class LinkCallbackRequest(BaseModel):
     public_token: str | None = None
 
 
+class DemoBank(BaseModel):
+    slug: str
+    name: str
+    note: str
+
+
 class ConfigOut(BaseModel):
-    provider: str
+    default_provider: str
+    plaid_enabled: bool
+    mock_enabled: bool = True
 
 
 # --- client-facing responses ---------------------------------------------------
@@ -90,6 +100,7 @@ class AccountOut(BaseModel):
     status: LinkedAccountStatus
     last_synced_at: datetime | None
     linked_created_at: datetime
+    provider: str
 
     @classmethod
     def from_row(cls, account, linked) -> "AccountOut":
@@ -107,6 +118,7 @@ class AccountOut(BaseModel):
             status=linked.status,
             last_synced_at=linked.last_synced_at,
             linked_created_at=linked.created_at,
+            provider=linked.provider,
         )
 
 

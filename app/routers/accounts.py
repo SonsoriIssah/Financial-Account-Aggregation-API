@@ -73,7 +73,7 @@ async def start_link(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        token = await get_provider().create_link_token(current_user)
+        token = await get_provider(body.provider).create_link_token(current_user)
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     return LinkStartResponse(link_token=token.link_token, expires_in=token.expires_in)
@@ -85,7 +85,8 @@ async def complete_link(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    provider = get_provider()
+    provider_name = body.provider or settings.provider
+    provider = get_provider(provider_name)
 
     # step 2 of the handshake: turn the client's callback into a stored token
     try:
@@ -107,6 +108,7 @@ async def complete_link(
     if linked is None:
         linked = LinkedAccount(
             user_id=current_user.id,
+            provider=provider_name,
             provider_item_id=item.provider_item_id,
             institution_name=item.institution_name,
             access_token=encrypt(item.access_token),
@@ -116,6 +118,7 @@ async def complete_link(
         await db.flush()
     else:
         # re-linking an existing connection (e.g. after needs_reauth)
+        linked.provider = provider_name
         linked.institution_name = item.institution_name
         linked.access_token = encrypt(item.access_token)
         linked.status = LinkedAccountStatus.ACTIVE

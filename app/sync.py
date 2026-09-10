@@ -72,7 +72,7 @@ async def sync_linked_account(db: AsyncSession, linked_account: LinkedAccount) -
 
     # 1. pull from the provider (retry/backoff and the outbound token bucket
     #    live in app.provider for the mock)
-    provider = get_provider()
+    provider = get_provider(linked_account.provider)
     try:
         provider_accounts = await provider.fetch_accounts(linked_account)
         provider_txns = await provider.fetch_transactions(linked_account)

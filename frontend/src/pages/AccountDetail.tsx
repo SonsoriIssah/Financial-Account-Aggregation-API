@@ -79,8 +79,6 @@ export function AccountDetail() {
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: api.listAccounts });
   const account = accountsQuery.data?.find((a) => a.id === accountId);
 
-  const configQuery = useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: Infinity });
-
   const balanceQuery = useQuery({
     queryKey: ["balance", accountId],
     queryFn: () => api.getBalance(accountId),
@@ -211,7 +209,7 @@ export function AccountDetail() {
   const job = statusQuery.data?.latest_job;
   const m = monthQuery.data;
   const balCurrency = balanceQuery.data?.currency ?? account.currency;
-  const providerLabel = configQuery.data?.provider === "plaid" ? "Plaid" : "Mock provider";
+  const providerLabel = account.provider === "plaid" ? "Plaid" : "Demo bank";
 
   return (
     <Layout onLink={() => setLinkOpen(true)}>
