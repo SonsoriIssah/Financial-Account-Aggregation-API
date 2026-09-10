@@ -39,5 +39,17 @@ class Settings(BaseSettings):
     # fixed-window limiting a single user's calls to the sync endpoint
     api_rate_limit_per_minute: int = 30
 
+    # Background processing (Phase 5)
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_sync_requests_topic: str = "account-sync-requests"
+    kafka_sync_results_topic: str = "account-sync-results"
+    kafka_consumer_group: str = "sync-workers"
+    # scheduler: re-sync an active link this many seconds after its last sync,
+    # polling for due links this often
+    sync_interval_seconds: int = 300
+    scheduler_poll_seconds: int = 60
+    # cap on how long the worker waits before requeueing a rate-limited sync
+    worker_max_requeue_delay_seconds: float = 60.0
+
 
 settings = Settings()

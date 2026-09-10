@@ -128,3 +128,10 @@ class LinkCallbackResponse(BaseModel):
     status: LinkedAccountStatus
     accounts: list[AccountOut]
     sync: SyncResultOut
+
+
+class SyncQueuedOut(BaseModel):
+    linked_account_id: UUID
+    status: str = "queued"
+    # False when Kafka was unreachable; the scheduler will still pick it up
+    queued: bool = True

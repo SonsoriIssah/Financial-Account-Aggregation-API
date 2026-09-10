@@ -75,6 +75,21 @@ async def db(sessionmaker_):
 
 
 @pytest_asyncio.fixture
+async def run_sync(sessionmaker_):
+    """Invoke the worker's unit of work with a fresh session per call, exactly
+    as ``run_worker`` does for each Kafka message."""
+    from app.worker import process_sync_request
+
+    async def _run(linked_account_id):
+        async with sessionmaker_() as session:
+            return await process_sync_request(
+                session, {"linked_account_id": str(linked_account_id)}
+            )
+
+    return _run
+
+
+@pytest_asyncio.fixture
 async def client(sessionmaker_):
     async def _get_db():
         async with sessionmaker_() as session:
@@ -95,3 +110,22 @@ async def auth_client(client):
     token = (await client.post("/auth/login", json=creds)).json()["access_token"]
     client.headers["Authorization"] = f"Bearer {token}"
     return client
+
+
+@pytest.fixture(autouse=True)
+def kafka_capture(monkeypatch):
+    """Replace Kafka publishing with an in-memory list of sent messages.
+
+    ``enqueue_sync`` and the worker's result-emit both funnel through
+    ``kafka_client.publish``, so patching it captures everything.
+    """
+    from app import kafka_client
+
+    sent: list[dict] = []
+
+    async def _publish(topic, key, value):
+        sent.append({"topic": topic, "key": key, "value": value})
+        return True
+
+    monkeypatch.setattr(kafka_client, "publish", _publish)
+    return sent
