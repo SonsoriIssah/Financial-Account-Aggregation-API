@@ -66,6 +66,18 @@ All routes require a bearer token except `/auth/*` and `/health`.
 | GET | `/accounts/{id}/sync-status` | Status of the most recent sync job |
 | DELETE | `/accounts/{id}` | Unlink (cascades accounts, transactions, jobs) |
 
+## Providers
+
+`PROVIDER` selects the aggregator (`app/providers/`):
+
+- **`mock`** (default) — the local fake bank service on `:9000`
+- **`plaid`** — Plaid sandbox or production. Set `PLAID_CLIENT_ID`, `PLAID_SECRET`,
+  `PLAID_ENV`, `PLAID_COUNTRY_CODES`. The frontend reads `GET /config` and shows the
+  Plaid Link widget instead of the mock bank picker.
+
+Provider access tokens are encrypted at rest with Fernet (`ENCRYPTION_KEY`); the
+built-in default is dev-only.
+
 ## Resilience
 
 | Failure | Handling |
@@ -78,8 +90,7 @@ All routes require a bearer token except `/auth/*` and `/health`.
 | Kafka briefly unreachable | `POST /sync` still returns 202; the scheduler catches the account next pass |
 | Redis unreachable | Rate limiters fail open (logged) |
 
-Access tokens are intended to be encrypted at rest (Fernet) — currently a
-known gap, stored plaintext.
+Provider access tokens are encrypted at rest with Fernet (`ENCRYPTION_KEY`).
 
 ## Tests
 

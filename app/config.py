@@ -34,9 +34,31 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
 
-    # Aggregator provider (mock service during development)
-    mock_provider_base_url: str = "http://127.0.0.1:9000"
+    # Aggregator provider: "mock" (local fake service) or "plaid"
+    provider: str = "mock"
     provider_timeout_seconds: float = 30.0
+
+    # mock provider
+    mock_provider_base_url: str = "http://127.0.0.1:9000"
+
+    # Plaid (used when provider == "plaid")
+    plaid_client_id: str = ""
+    plaid_secret: str = ""
+    plaid_env: str = "sandbox"  # sandbox | production
+    plaid_country_codes: str = "US"
+    plaid_products: str = "transactions"
+
+    # Fernet key for encrypting provider access tokens at rest. Generate with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # This default is dev-only and public; set a real one via ENCRYPTION_KEY.
+    encryption_key: str = "ZmFhLWRldi1vbmx5LWZlcm5ldC1rZXktMDAwMDAwMDE="
+
+    @property
+    def plaid_host(self) -> str:
+        return {
+            "sandbox": "https://sandbox.plaid.com",
+            "production": "https://production.plaid.com",
+        }.get(self.plaid_env, "https://sandbox.plaid.com")
 
     # Resilience (Phase 4)
     redis_url: str = "redis://localhost:6379/0"

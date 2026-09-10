@@ -8,6 +8,7 @@ from app.kafka_client import close_producer
 from app.logging_config import configure_logging
 from app.redis_client import close_redis
 from app.routers import auth, accounts
+from app.schemas import ConfigOut
 
 configure_logging()
 
@@ -37,3 +38,9 @@ app.include_router(accounts.router)
 @app.get('/health')
 async def health():
     return {'status': 'ok'}
+
+
+@app.get('/config', response_model=ConfigOut)
+async def config():
+    """Public — tells the frontend which link flow to render."""
+    return ConfigOut(provider=settings.provider)
