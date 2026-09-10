@@ -24,6 +24,8 @@ dependencies = [
 
 [project.scripts]
 financial-account-aggregation-api = "financial_account_aggregation_api:main"
+faa-worker = "app.worker:main"
+faa-scheduler = "app.scheduler:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]

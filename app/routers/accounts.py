@@ -9,7 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app import kafka_client
-from app.models import Account, LinkedAccount, LinkedAccountStatus, AccountType, Transaction, User
+from app.models import (
+    Account,
+    AccountType,
+    LinkedAccount,
+    LinkedAccountStatus,
+    SyncJob,
+    Transaction,
+    User,
+)
 from app.provider import ProviderError, fetch_accounts
 from app.ratelimit import RateLimited, enforce_user_limit
 from app.redis_client import get_redis
@@ -21,8 +29,10 @@ from app.schemas import (
     LinkCallbackResponse,
     LinkStartRequest,
     LinkStartResponse,
+    SyncJobOut,
     SyncQueuedOut,
     SyncResultOut,
+    SyncStatusOut,
     TransactionOut,
     TransactionPage,
 )
@@ -253,6 +263,30 @@ async def sync_account(
 
     queued = await kafka_client.enqueue_sync(linked.id, reason="manual")
     return SyncQueuedOut(linked_account_id=linked.id, queued=queued)
+
+
+@router.get("/{account_id}/sync-status", response_model=SyncStatusOut)
+async def sync_status(
+    account_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    account = await _get_owned_account(account_id, current_user, db)
+    linked = await db.get(LinkedAccount, account.linked_account_id)
+    latest = (
+        await db.execute(
+            select(SyncJob)
+            .where(SyncJob.linked_account_id == linked.id)
+            .order_by(SyncJob.started_at.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    return SyncStatusOut(
+        linked_account_id=linked.id,
+        account_status=linked.status,
+        last_synced_at=linked.last_synced_at,
+        latest_job=SyncJobOut.model_validate(latest) if latest else None,
+    )
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

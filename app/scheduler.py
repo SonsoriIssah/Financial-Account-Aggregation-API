@@ -62,6 +62,12 @@ async def run_scheduler() -> None:
         await kafka_client.close_producer()
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+def main() -> None:
+    from app.logging_config import configure_logging
+
+    configure_logging()
     asyncio.run(run_scheduler())
+
+
+if __name__ == "__main__":
+    main()

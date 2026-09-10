@@ -18,6 +18,8 @@ The returned SyncJob carries a transient ``transactions_synced`` attribute for
 the caller's response — it is not a stored column.
 """
 
+import logging
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -41,6 +43,9 @@ from app.provider import (
 from app.ratelimit import RateLimited
 
 
+log = logging.getLogger("app.sync")
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -49,8 +54,25 @@ def _bank_slug(linked_account: LinkedAccount) -> str:
     return linked_account.provider_item_id.removeprefix("mock-")
 
 
+def _emit(job: SyncJob, linked_account_id, started: float, synced: int) -> SyncJob:
+    job.transactions_synced = synced
+    log.info(
+        "sync finished",
+        extra={
+            "linked_account_id": str(linked_account_id),
+            "sync_job_id": str(job.id),
+            "status": job.status.value,
+            "transactions_synced": synced,
+            "rate_limited": getattr(job, "rate_limited", False),
+            "duration_ms": round((time.monotonic() - started) * 1000),
+        },
+    )
+    return job
+
+
 async def sync_linked_account(db: AsyncSession, linked_account: LinkedAccount) -> SyncJob:
     linked_account_id = linked_account.id
+    started = time.monotonic()
 
     job = SyncJob(linked_account_id=linked_account_id, status=SyncJobStatus.IN_PROGRESS)
     db.add(job)
@@ -72,10 +94,9 @@ async def sync_linked_account(db: AsyncSession, linked_account: LinkedAccount) -
             linked_account.status = LinkedAccountStatus.NEEDS_REAUTH
         await db.commit()
         await db.refresh(job)
-        job.transactions_synced = 0
         job.rate_limited = rate_limited
         job.retry_after = getattr(exc, "retry_after", None)
-        return job
+        return _emit(job, linked_account_id, started, 0)
 
     # 2. refresh cached balances
     result = await db.execute(
@@ -126,9 +147,7 @@ async def sync_linked_account(db: AsyncSession, linked_account: LinkedAccount) -
         db.add(failed)
         await db.commit()
         await db.refresh(failed)
-        failed.transactions_synced = 0
-        return failed
+        return _emit(failed, linked_account_id, started, 0)
 
     await db.refresh(job)
-    job.transactions_synced = inserted
-    return job
+    return _emit(job, linked_account_id, started, inserted)

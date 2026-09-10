@@ -41,7 +41,10 @@ code, they write it themselves.
 3. Linking + synchronous sync (no Kafka yet) — normalize-and-store, dedup, account endpoints. *(done)*
 4. Resilience — retry/backoff, Redis token-bucket rate limiter, `needs_reauth`, failure tests. *(done)*
 5. Background processing — Kafka `account-sync-requests`/`-results`, `app/worker.py`, `app/scheduler.py`. *(done)*
-6. Polish + metrics — sync-status endpoint, structured logging, load/chaos test. *(next)*
+6. Polish + metrics — `GET /accounts/{id}/sync-status`, JSON structured logging, `tests/test_chaos.py`. *(done)*
+
+All six phases implemented. Remaining hardening: Fernet token encryption, CI,
+multi-partition Kafka topics, dead-letter handling.
 
 ## Conventions
 
@@ -61,3 +64,6 @@ code, they write it themselves.
   `app.sync.sync_linked_account`; `python -m app.scheduler` enqueues due active links
   every `scheduler_poll_seconds`. The worker's unit of work is
   `app.worker.process_sync_request(db, payload)` — that's what tests drive.
+- Logging: `app.logging_config.configure_logging()` runs at each entry point; lines are
+  JSON (`LOG_JSON=true`). `app.sync` emits a `"sync finished"` line with
+  `linked_account_id`, `status`, `transactions_synced`, `duration_ms`.
