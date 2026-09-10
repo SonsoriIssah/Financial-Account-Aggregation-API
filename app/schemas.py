@@ -89,6 +89,7 @@ class AccountOut(BaseModel):
     institution_name: str
     status: LinkedAccountStatus
     last_synced_at: datetime | None
+    linked_created_at: datetime
 
     @classmethod
     def from_row(cls, account, linked) -> "AccountOut":
@@ -105,6 +106,7 @@ class AccountOut(BaseModel):
             institution_name=linked.institution_name,
             status=linked.status,
             last_synced_at=linked.last_synced_at,
+            linked_created_at=linked.created_at,
         )
 
 

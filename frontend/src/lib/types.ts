@@ -25,6 +25,7 @@ export interface Account {
   institution_name: string;
   status: AccountStatus;
   last_synced_at: string | null;
+  linked_created_at: string;
 }
 
 export interface Balance {

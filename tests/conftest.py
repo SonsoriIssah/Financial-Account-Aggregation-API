@@ -60,6 +60,7 @@ async def sessionmaker_(engine):
 
 @pytest_asyncio.fixture(autouse=True)
 async def _clean(engine, monkeypatch):
+    monkeypatch.setattr(settings, "provider", "mock")  # tests target the mock provider
     async with engine.begin() as conn:
         await conn.execute(text(f"TRUNCATE {_TABLES} RESTART IDENTITY CASCADE"))
     monkeypatch.setattr(redis_client, "_client", None)  # rebind to this test's loop
