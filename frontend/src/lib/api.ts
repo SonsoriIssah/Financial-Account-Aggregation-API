@@ -6,6 +6,7 @@ import type {
   LinkCallbackResult,
   LinkCallbackPayload,
   LinkStart,
+  SyncActivityItem,
   SyncQueued,
   SyncStatus,
   TransactionPage,
@@ -120,6 +121,7 @@ export const api = {
     request<TransactionPage>(`/accounts/${id}/transactions?${params.toString()}`),
   syncAccount: (id: string) => request<SyncQueued>(`/accounts/${id}/sync`, { method: "POST" }),
   syncStatus: (id: string) => request<SyncStatus>(`/accounts/${id}/sync-status`),
+  syncActivity: () => request<SyncActivityItem[]>("/accounts/sync-activity"),
   unlinkAccount: (id: string) => request<void>(`/accounts/${id}`, { method: "DELETE" }),
 
   // linking

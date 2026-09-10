@@ -31,6 +31,7 @@ from app.schemas import (
     LinkCallbackResponse,
     LinkStartRequest,
     LinkStartResponse,
+    SyncActivityItem,
     SyncJobOut,
     SyncQueuedOut,
     SyncResultOut,
@@ -186,6 +187,33 @@ async def list_accounts(
         .order_by(LinkedAccount.institution_name, Account.account_name)
     )
     return [AccountOut.from_row(account, linked) for account, linked in result.all()]
+
+
+@router.get("/sync-activity", response_model=list[SyncActivityItem])
+async def sync_activity(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+):
+    result = await db.execute(
+        select(SyncJob, LinkedAccount.institution_name)
+        .join(LinkedAccount, SyncJob.linked_account_id == LinkedAccount.id)
+        .where(LinkedAccount.user_id == current_user.id)
+        .order_by(SyncJob.started_at.desc())
+        .limit(limit)
+    )
+    return [
+        SyncActivityItem(
+            id=job.id,
+            linked_account_id=job.linked_account_id,
+            institution_name=name,
+            status=job.status,
+            error_message=job.error_message,
+            started_at=job.started_at,
+            finished_at=job.finished_at,
+        )
+        for job, name in result.all()
+    ]
 
 
 @router.get("/{account_id}/balance", response_model=BalanceOut)
