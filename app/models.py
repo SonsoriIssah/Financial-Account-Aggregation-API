@@ -41,6 +41,8 @@ class LinkedAccount(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True
     )
+    # which aggregator this connection uses: "mock" or "plaid"
+    provider: Mapped[str] = mapped_column(nullable=False, server_default="mock")
     provider_item_id: Mapped[str] = mapped_column(nullable=False)
     institution_name: Mapped[str] = mapped_column(nullable=False)
     # Provider access token, stored encrypted at rest (Fernet). Never log this value.

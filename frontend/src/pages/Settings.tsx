@@ -84,7 +84,7 @@ export function Settings() {
   const configQuery = useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: Infinity });
   const accounts = accountsQuery.data ?? [];
   const connections = useMemo(() => groupConnections(accounts), [accounts]);
-  const providerLabel = configQuery.data?.provider === "plaid" ? "Plaid" : "Mock provider";
+  const defaultProvider = configQuery.data?.default_provider ?? "mock";
   const currency = accounts[0]?.currency ?? "GHS";
 
   const unlink = useMutation({
@@ -164,11 +164,15 @@ export function Settings() {
               <div className="flex flex-col gap-space-md">
                 <PrefRow
                   icon="hub"
-                  label="Aggregator provider"
-                  sub={configQuery.data?.provider === "plaid" ? "Plaid — live bank connections" : "Local mock service"}
+                  label="Default for new links"
+                  sub={
+                    configQuery.data?.plaid_enabled
+                      ? "Plaid and demo banks are both available"
+                      : "Demo banks only (Plaid not configured)"
+                  }
                   control={
-                    <span className="px-space-xs py-1 rounded-lg bg-surface-container text-label-sm font-bold">
-                      {providerLabel}
+                    <span className="px-space-xs py-1 rounded-lg bg-surface-container text-label-sm font-bold capitalize">
+                      {defaultProvider}
                     </span>
                   }
                 />
@@ -261,7 +265,8 @@ export function Settings() {
                             </div>
                             <span className="text-caption text-on-surface-variant">
                               Linked {relativeTime(c.linkedAt)} · {c.accounts.length} account
-                              {c.accounts.length === 1 ? "" : "s"}
+                              {c.accounts.length === 1 ? "" : "s"} · via{" "}
+                              {c.accounts[0].provider === "plaid" ? "Plaid" : "demo bank"}
                             </span>
                           </div>
                         </div>

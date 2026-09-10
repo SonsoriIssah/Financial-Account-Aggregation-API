@@ -3,6 +3,7 @@ import type {
   AppConfig,
   AuthTokens,
   Balance,
+  DemoBank,
   LinkCallbackResult,
   LinkCallbackPayload,
   LinkStart,
@@ -106,6 +107,7 @@ async function request<T>(path: string, opts: Options = {}): Promise<T> {
 
 export const api = {
   config: () => request<AppConfig>("/config", { auth: false }),
+  demoBanks: () => request<DemoBank[]>("/providers/demo-banks", { auth: false }),
 
   // auth
   register: (email: string, password: string) =>

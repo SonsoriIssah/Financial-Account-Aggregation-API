@@ -2,22 +2,23 @@ import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
 import { api, ApiError } from "../lib/api";
-import { MOCK_BANKS } from "../lib/types";
-import type { LinkCallbackResult } from "../lib/types";
+import type { DemoBank, LinkCallbackResult } from "../lib/types";
 import { formatMoney } from "../lib/format";
 import { Button, Icon, Spinner } from "../components/ui";
 
-// --- shared shell -------------------------------------------------------
+// --- shared shell -----------------------------------------------------
 
 function Shell({
   steps,
   active,
   onClose,
+  onBack,
   children,
 }: {
   steps: string[];
   active: number;
   onClose: () => void;
+  onBack?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -26,9 +27,15 @@ function Shell({
         <div className="px-space-xl pt-space-xl pb-space-md">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-space-sm">
-              <span className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-primary">
-                <Icon name="account_balance" className="text-[20px]" />
-              </span>
+              {onBack ? (
+                <button onClick={onBack} className="text-on-surface-variant hover:text-on-surface p-1 -ml-1">
+                  <Icon name="arrow_back" className="text-[20px]" />
+                </button>
+              ) : (
+                <span className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-primary">
+                  <Icon name="account_balance" className="text-[20px]" />
+                </span>
+              )}
               <div>
                 <h2 className="text-headline-sm font-semibold">Link a bank account</h2>
                 <p className="text-label-sm text-on-surface-variant font-normal">
@@ -40,26 +47,28 @@ function Shell({
               <Icon name="close" className="text-[20px]" />
             </button>
           </div>
-          <div className="flex items-center gap-space-xs mt-space-lg">
-            {steps.map((label, i) => (
-              <div key={label} className="flex-1 flex flex-col gap-1.5">
-                <div className={`h-1.5 rounded-full ${i <= active ? "bg-primary" : "bg-surface-container-highest"}`} />
-                <span
-                  className={`text-label-sm ${
-                    i <= active ? "text-primary font-semibold" : "text-on-surface-variant"
-                  }`}
-                >
-                  {i + 1}. {label}
-                </span>
-              </div>
-            ))}
-          </div>
+          {steps.length > 1 && (
+            <div className="flex items-center gap-space-xs mt-space-lg">
+              {steps.map((label, i) => (
+                <div key={label} className="flex-1 flex flex-col gap-1.5">
+                  <div className={`h-1.5 rounded-full ${i <= active ? "bg-primary" : "bg-surface-container-highest"}`} />
+                  <span
+                    className={`text-label-sm ${
+                      i <= active ? "text-primary font-semibold" : "text-on-surface-variant"
+                    }`}
+                  >
+                    {i + 1}. {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="px-space-xl mb-space-md">
           <div className="flex items-start gap-space-sm px-space-md py-space-xs rounded-xl bg-surface-container-low">
             <Icon name="shield_lock" className="text-primary text-[18px] shrink-0 mt-0.5" />
             <p className="text-caption text-on-surface-variant leading-relaxed">
-              You authenticate on your bank's own page. KudiVault never sees or stores your banking
+              You authenticate on the bank's own page. KudiVault never sees or stores your banking
               credentials.
             </p>
           </div>
@@ -98,23 +107,21 @@ function ResultView({ result }: { result: LinkCallbackResult }) {
   );
 }
 
-// --- mock flow --------------------------------------------------------
+// --- demo-bank flow --------------------------------------------------
 
-function MockFlow({ onClose }: { onClose: () => void }) {
+function DemoBankFlow({ bank, onBack, onClose }: { bank: DemoBank; onBack: () => void; onClose: () => void }) {
   const qc = useQueryClient();
-  const [step, setStep] = useState<"bank" | "name" | "working" | "done" | "error">("bank");
-  const [slug, setSlug] = useState<string | null>(null);
-  const [name, setName] = useState("My account");
+  const [step, setStep] = useState<"name" | "working" | "done" | "error">("name");
+  const [name, setName] = useState(bank.name);
   const [result, setResult] = useState<LinkCallbackResult | null>(null);
   const [error, setError] = useState("");
-  const bank = MOCK_BANKS.find((b) => b.slug === slug);
 
   async function connect() {
-    if (!bank) return;
     setStep("working");
     try {
-      const start = await api.startLink(name);
+      const start = await api.startLink("mock");
       const res = await api.completeLink({
+        provider: "mock",
         link_token: start.link_token,
         bank_slug: bank.slug,
         institution_name: name,
@@ -128,43 +135,22 @@ function MockFlow({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const active = { bank: 0, name: 1, working: 2, done: 2, error: 2 }[step];
-
   return (
-    <Shell steps={["Bank", "Name", "Connect"]} active={active} onClose={onClose}>
-      {step === "bank" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">
-          {MOCK_BANKS.map((b) => (
-            <button
-              key={b.slug}
-              onClick={() => setSlug(b.slug)}
-              className={`p-space-md rounded-xl flex items-center gap-space-sm text-left transition-colors ${
-                slug === b.slug
-                  ? "bg-surface-container-low ring-2 ring-primary"
-                  : "bg-surface-container-lowest hover:bg-surface-container-low"
-              }`}
-            >
-              <span className="w-9 h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold text-body-sm shrink-0">
-                {b.name.replace("Mock Bank ", "")}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-body-sm font-semibold text-on-surface truncate">{b.name}</span>
-                <span className="block text-caption text-on-surface-variant">{b.note}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
+    <Shell
+      steps={["Choose", "Name", "Connect"]}
+      active={step === "name" ? 1 : 2}
+      onClose={onClose}
+      onBack={step === "name" ? onBack : undefined}
+    >
       {step === "name" && (
         <div className="flex flex-col gap-space-md">
           <div className="p-space-md rounded-xl bg-surface-container-low flex items-center gap-space-sm">
             <span className="w-10 h-10 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold text-body-sm">
-              {bank?.name.replace("Mock Bank ", "")}
+              {bank.name.slice(0, 3).toUpperCase()}
             </span>
             <div>
-              <span className="text-caption text-on-surface-variant uppercase tracking-wider">Selected bank</span>
-              <p className="text-body-sm font-semibold text-on-surface">{bank?.name}</p>
+              <span className="text-caption text-on-surface-variant uppercase tracking-wider">Demo bank</span>
+              <p className="text-body-sm font-semibold text-on-surface">{bank.name}</p>
             </div>
           </div>
           <label className="flex flex-col gap-space-2xs">
@@ -176,23 +162,16 @@ function MockFlow({ onClose }: { onClose: () => void }) {
               className="h-12 rounded-xl bg-surface-container-low px-space-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="e.g. Salary account"
             />
-            <span className="text-caption text-on-surface-variant">
-              Just a label to recognise it on your dashboard.
-            </span>
           </label>
         </div>
       )}
-
       {step === "working" && (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-space-sm">
           <Spinner className="text-[36px] text-primary" />
-          <p className="text-headline-sm font-semibold">Connecting securely…</p>
-          <p className="text-body-sm text-on-surface-variant">
-            Exchanging tokens with {bank?.name} and pulling your accounts
-          </p>
+          <p className="text-headline-sm font-semibold">Connecting…</p>
+          <p className="text-body-sm text-on-surface-variant">Pulling accounts from {bank.name}</p>
         </div>
       )}
-
       {step === "error" && (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-space-sm">
           <Icon name="cloud_off" className="text-[36px] text-error" />
@@ -200,23 +179,9 @@ function MockFlow({ onClose }: { onClose: () => void }) {
           <p className="text-body-sm text-on-surface-variant">{error}</p>
         </div>
       )}
-
       {step === "done" && result && <ResultView result={result} />}
 
-      <div className="mt-auto pt-space-lg flex items-center justify-between gap-space-sm">
-        <Button
-          variant="surface"
-          icon="arrow_back"
-          onClick={() => setStep("bank")}
-          disabled={step === "bank" || step === "working" || step === "done"}
-        >
-          Back
-        </Button>
-        {step === "bank" && (
-          <Button icon="arrow_forward" disabled={!slug} onClick={() => setStep("name")}>
-            Continue
-          </Button>
-        )}
+      <div className="mt-auto pt-space-lg flex items-center justify-end gap-space-sm">
         {step === "name" && (
           <Button icon="link" disabled={!name.trim()} onClick={connect}>
             Connect
@@ -237,9 +202,9 @@ function MockFlow({ onClose }: { onClose: () => void }) {
   );
 }
 
-// --- plaid flow ------------------------------------------------------
+// --- plaid flow ---------------------------------------------------
 
-function PlaidFlow({ onClose }: { onClose: () => void }) {
+function PlaidFlow({ onBack, onClose }: { onBack: () => void; onClose: () => void }) {
   const qc = useQueryClient();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "working" | "done" | "error">("idle");
@@ -248,7 +213,7 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     api
-      .startLink()
+      .startLink("plaid")
       .then((s) => setLinkToken(s.link_token))
       .catch((err) => {
         setError(err instanceof ApiError ? err.detail : "Could not start Plaid Link");
@@ -261,6 +226,7 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
       setPhase("working");
       try {
         const res = await api.completeLink({
+          provider: "plaid",
           public_token,
           institution_name: metadata.institution?.name,
         });
@@ -283,10 +249,13 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const active = phase === "idle" ? 0 : 1;
-
   return (
-    <Shell steps={["Open Plaid", "Connect"]} active={active} onClose={onClose}>
+    <Shell
+      steps={["Choose", "Open Plaid", "Connect"]}
+      active={phase === "idle" ? 1 : 2}
+      onClose={onClose}
+      onBack={phase === "idle" ? onBack : undefined}
+    >
       {phase === "idle" && (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-space-sm">
           <span className="w-14 h-14 rounded-2xl bg-surface-container-high flex items-center justify-center text-primary">
@@ -294,7 +263,7 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
           </span>
           <p className="text-headline-sm font-semibold">Connect with Plaid</p>
           <p className="text-body-sm text-on-surface-variant max-w-sm">
-            Plaid opens your bank's secure login. Use the sandbox credentials{" "}
+            Plaid opens your bank's secure login. Sandbox credentials:{" "}
             <span className="font-mono">user_good</span> / <span className="font-mono">pass_good</span>.
           </p>
         </div>
@@ -303,7 +272,6 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-space-sm">
           <Spinner className="text-[36px] text-primary" />
           <p className="text-headline-sm font-semibold">Finishing up…</p>
-          <p className="text-body-sm text-on-surface-variant">Exchanging the token and pulling accounts</p>
         </div>
       )}
       {phase === "error" && (
@@ -321,11 +289,6 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
             {linkToken ? "Open Plaid" : "Preparing…"}
           </Button>
         )}
-        {phase === "error" && (
-          <Button icon="refresh" onClick={() => window.location.reload()}>
-            Try again
-          </Button>
-        )}
         {phase === "done" && (
           <Button icon="check" onClick={onClose}>
             Done
@@ -336,23 +299,81 @@ function PlaidFlow({ onClose }: { onClose: () => void }) {
   );
 }
 
-// --- entry ----------------------------------------------------------
+// --- entry: chooser -----------------------------------------------
+
+type Choice = { kind: "plaid" } | { kind: "demo"; bank: DemoBank };
 
 export function LinkAccountModal({ onClose }: { onClose: () => void }) {
+  const [choice, setChoice] = useState<Choice | null>(null);
   const configQuery = useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: Infinity });
+  const banksQuery = useQuery({ queryKey: ["demo-banks"], queryFn: api.demoBanks, staleTime: 60_000 });
 
-  if (configQuery.isLoading) {
-    return (
-      <Shell steps={["…"]} active={0} onClose={onClose}>
+  if (choice?.kind === "plaid") {
+    return <PlaidFlow onBack={() => setChoice(null)} onClose={onClose} />;
+  }
+  if (choice?.kind === "demo") {
+    return <DemoBankFlow bank={choice.bank} onBack={() => setChoice(null)} onClose={onClose} />;
+  }
+
+  const banks = banksQuery.data ?? [];
+  const plaid = configQuery.data?.plaid_enabled;
+
+  return (
+    <Shell steps={["Choose"]} active={0} onClose={onClose}>
+      {configQuery.isLoading || banksQuery.isLoading ? (
         <div className="flex-1 flex items-center justify-center text-primary">
           <Spinner className="text-[28px]" />
         </div>
-      </Shell>
-    );
-  }
-  return configQuery.data?.provider === "plaid" ? (
-    <PlaidFlow onClose={onClose} />
-  ) : (
-    <MockFlow onClose={onClose} />
+      ) : (
+        <div className="space-y-space-md">
+          {plaid && (
+            <button
+              onClick={() => setChoice({ kind: "plaid" })}
+              className="w-full p-space-md rounded-xl bg-surface-container-lowest hover:bg-surface-container-low ring-1 ring-surface-container flex items-center gap-space-sm text-left transition-colors"
+            >
+              <span className="w-10 h-10 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                <Icon name="account_balance" className="text-[20px]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-body-sm font-semibold">Connect a real bank</span>
+                <span className="block text-caption text-on-surface-variant">
+                  Via Plaid — opens your bank's secure login
+                </span>
+              </span>
+              <Icon name="chevron_right" className="text-[18px] text-outline" />
+            </button>
+          )}
+
+          <div>
+            <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-space-xs">
+              {plaid ? "Or use a demo bank" : "Choose a demo bank"}
+            </p>
+            {banks.length === 0 ? (
+              <p className="text-body-sm text-on-surface-variant">
+                The demo bank service isn't reachable.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">
+                {banks.map((b) => (
+                  <button
+                    key={b.slug}
+                    onClick={() => setChoice({ kind: "demo", bank: b })}
+                    className="p-space-md rounded-xl bg-surface-container-lowest hover:bg-surface-container-low flex items-center gap-space-sm text-left transition-colors"
+                  >
+                    <span className="w-9 h-9 rounded-lg bg-surface-container-high text-on-surface flex items-center justify-center font-bold text-label-sm shrink-0">
+                      {b.name.slice(0, 3).toUpperCase()}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-body-sm font-semibold truncate">{b.name}</span>
+                      <span className="block text-caption text-on-surface-variant truncate">{b.note}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Shell>
   );
 }

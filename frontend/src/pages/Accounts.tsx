@@ -157,7 +157,8 @@ export function Accounts() {
                       <td className="py-space-md px-space-md">
                         <span className="block">{a.account_name}</span>
                         <span className="block text-caption text-on-surface-variant capitalize">
-                          {a.account_type} · {a.provider_account_id}
+                          {a.account_type} · {a.provider_account_id} · via{" "}
+                          {a.provider === "plaid" ? "Plaid" : "demo bank"}
                         </span>
                       </td>
                       <td className="py-space-md px-space-md">

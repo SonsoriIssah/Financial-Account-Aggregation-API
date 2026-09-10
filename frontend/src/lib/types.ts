@@ -26,6 +26,7 @@ export interface Account {
   status: AccountStatus;
   last_synced_at: string | null;
   linked_created_at: string;
+  provider: string;
 }
 
 export interface Balance {
@@ -81,7 +82,15 @@ export interface SyncActivityItem {
 }
 
 export interface AppConfig {
-  provider: "mock" | "plaid";
+  default_provider: "mock" | "plaid";
+  plaid_enabled: boolean;
+  mock_enabled: boolean;
+}
+
+export interface DemoBank {
+  slug: string;
+  name: string;
+  note: string;
 }
 
 export interface LinkStart {
@@ -90,6 +99,7 @@ export interface LinkStart {
 }
 
 export interface LinkCallbackPayload {
+  provider: "mock" | "plaid";
   institution_name?: string;
   link_token?: string;
   bank_slug?: string;
@@ -117,9 +127,3 @@ export interface SyncQueued {
   status: "queued";
   queued: boolean;
 }
-
-export const MOCK_BANKS = [
-  { slug: "bank-a", name: "Mock Bank A", note: "Standard sandbox bank" },
-  { slug: "bank-b", name: "Mock Bank B", note: "Intermittently unavailable" },
-  { slug: "bank-c", name: "Mock Bank C", note: "Slow responses" },
-] as const;

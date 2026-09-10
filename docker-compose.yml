@@ -50,5 +50,13 @@ services:
       timeout: 5s
       retries: 10
 
+  mockbank:
+    build: ./mockbank
+    ports:
+      - "9000:9000"
+    environment:
+      # how often each fake bank grows its ledger; drop to ~120 for a live demo
+      MOCKBANK_TICK_SECONDS: "1800"
+
 volumes:
   pgdata:

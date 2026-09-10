@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,7 +9,7 @@ from app.kafka_client import close_producer
 from app.logging_config import configure_logging
 from app.redis_client import close_redis
 from app.routers import auth, accounts
-from app.schemas import ConfigOut
+from app.schemas import ConfigOut, DemoBank
 
 configure_logging()
 
@@ -42,5 +43,20 @@ async def health():
 
 @app.get('/config', response_model=ConfigOut)
 async def config():
-    """Public — tells the frontend which link flow to render."""
-    return ConfigOut(provider=settings.provider)
+    """Public — tells the frontend which link options to offer."""
+    return ConfigOut(
+        default_provider=settings.provider,
+        plaid_enabled=bool(settings.plaid_client_id and settings.plaid_secret),
+    )
+
+
+@app.get('/providers/demo-banks', response_model=list[DemoBank])
+async def demo_banks():
+    """Public — the fake banks the mock service currently offers."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{settings.mock_provider_base_url}/banks")
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPError:
+        return []
