@@ -4,18 +4,27 @@ from app.schemas import UserRegister, UserLogin,RefreshRequest
 from app.auth import hash_password, verify_password,create_access_token,create_refresh_token,decode_and_verify_type
 from app.database import get_db
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from fastapi.security import OAuth2PasswordBearer
 from jose import  JWTError
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/login')
 
+# Verified against when an email isn't found, so login timing doesn't reveal
+# whether an account exists.
+_DUMMY_PASSWORD_HASH = hash_password('not-a-real-account')
+
 @router.post('/register')
 async def register(user: UserRegister, db=Depends(get_db)):
     password = hash_password(user.password)
     db_user = User(email=user.email, hashed_password=password)
     db.add(db_user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail='Email already registered')
     await db.refresh(db_user)
     return {
         'id': db_user.id,
@@ -27,19 +36,18 @@ async def login(user: UserLogin, db=Depends(get_db)):
     query = await db.execute(select(User).where(User.email==user.email))
     db_user = query.scalars().first()
     if not db_user:
+        verify_password(user.password, _DUMMY_PASSWORD_HASH)
         raise HTTPException(status_code=401,detail='Invalid email or password')
-    password = verify_password(user.password,db_user.hashed_password)
-    if not password:
+    if not verify_password(user.password,db_user.hashed_password):
         raise HTTPException(status_code=401,detail='Invalid email or password')
     return {
-        'access_token': create_access_token({'sub': user.email}),
-        'refresh_token': create_refresh_token({'sub': user.email}),
+        'access_token': create_access_token({'sub': db_user.email}),
+        'refresh_token': create_refresh_token({'sub': db_user.email}),
     }
 async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
     try:
         payload = decode_and_verify_type(token,'access')
         email = payload.get('sub')
-        token_type = payload.get('type')
     except JWTError:
         raise HTTPException(status_code=401, detail='Could not validate credentials')
     result = await db.execute(select(User).where(User.email == email))
@@ -59,5 +67,5 @@ async def refresh(token: RefreshRequest, db=Depends(get_db)):
     user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=401, detail='Could not validate credentials')
-    return create_access_token({'sub': user.email})
+    return {'access_token': create_access_token({'sub': user.email})}
 
