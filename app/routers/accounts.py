@@ -154,7 +154,7 @@ async def complete_link(
         linked_account_id=linked.id,
         institution_name=linked.institution_name,
         status=linked.status,
-        accounts=[AccountOut.model_validate(a) for a in accounts],
+        accounts=[AccountOut.from_row(a, linked) for a in accounts],
         sync=SyncResultOut.from_job(job, getattr(job, "transactions_synced", 0)),
     )
 
@@ -165,12 +165,12 @@ async def list_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Account)
+        select(Account, LinkedAccount)
         .join(LinkedAccount, Account.linked_account_id == LinkedAccount.id)
         .where(LinkedAccount.user_id == current_user.id)
-        .order_by(Account.account_name)
+        .order_by(LinkedAccount.institution_name, Account.account_name)
     )
-    return [AccountOut.model_validate(a) for a in result.scalars()]
+    return [AccountOut.from_row(account, linked) for account, linked in result.all()]
 
 
 @router.get("/{account_id}/balance", response_model=BalanceOut)
