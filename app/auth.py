@@ -1,23 +1,24 @@
 # This file handles passwords and login tokens (JWT).
 # Other files use these functions to check who a user is.
 
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 
 from app.config import settings
 
-# This turns plain passwords into scrambled (hashed) text, and checks them later.
-pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+# bcrypt hashes only the first 72 bytes of a password and raises on longer
+# input, so truncate to that limit explicitly.
+BCRYPT_MAX_BYTES = 72
 
 
 # Turn a plain password into a hashed password, so we never store the real password.
 def hash_password(password:str)->str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8')[:BCRYPT_MAX_BYTES], bcrypt.gensalt()).decode('utf-8')
 
 # Check if a plain password matches a hashed password.
 def verify_password(plain_password:str, hashed_password:str)->bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8')[:BCRYPT_MAX_BYTES], hashed_password.encode('utf-8'))
 
 # Create a short-lived access token for a logged-in user.
 def create_access_token(data:dict)->str:
