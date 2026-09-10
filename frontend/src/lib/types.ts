@@ -69,9 +69,20 @@ export interface SyncStatus {
   latest_job: SyncJob | null;
 }
 
+export interface AppConfig {
+  provider: "mock" | "plaid";
+}
+
 export interface LinkStart {
   link_token: string;
   expires_in: number;
+}
+
+export interface LinkCallbackPayload {
+  institution_name?: string;
+  link_token?: string;
+  bank_slug?: string;
+  public_token?: string;
 }
 
 export interface SyncResult {
