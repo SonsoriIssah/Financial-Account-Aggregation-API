@@ -31,6 +31,12 @@ class LinkedAccountStatus(enum.Enum):
 
 class LinkedAccount(Base):
     __tablename__ = 'linked_accounts'
+    __table_args__ = (
+        UniqueConstraint(
+            'user_id', 'provider_item_id',
+            name='uq_linked_accounts_user_id_provider_item_id',
+        ),
+    )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True
