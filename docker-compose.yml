@@ -53,10 +53,11 @@ services:
   mockbank:
     build: ./mockbank
     ports:
-      - "9000:9000"
+      # host port overridable if 9000 is taken: MOCKBANK_HOST_PORT=9001 docker compose up -d
+      - "${MOCKBANK_HOST_PORT:-9000}:9000"
     environment:
       # how often each fake bank grows its ledger; drop to ~120 for a live demo
-      MOCKBANK_TICK_SECONDS: "1800"
+      MOCKBANK_TICK_SECONDS: "${MOCKBANK_TICK_SECONDS:-1800}"
 
 volumes:
   pgdata:

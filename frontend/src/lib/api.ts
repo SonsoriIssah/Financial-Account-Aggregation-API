@@ -114,6 +114,8 @@ export const api = {
     request<User>("/auth/register", { method: "POST", body: { email, password }, auth: false }),
   login: (email: string, password: string) =>
     request<AuthTokens>("/auth/login", { method: "POST", body: { email, password }, auth: false }),
+  testAccount: () =>
+    request<AuthTokens & { email: string }>("/auth/test-account", { method: "POST", auth: false }),
   me: () => request<User>("/auth/me"),
 
   // accounts
