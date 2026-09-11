@@ -11,3 +11,12 @@ wheels/
 
 # Environment
 .env
+.env.*
+!.env.example
+.neon
+.claude/skills/
+.claude/settings.local.json
+/skills-lock.json
+/package.json
+/package-lock.json
+node_modules/

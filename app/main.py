@@ -52,9 +52,13 @@ async def config():
 
 @app.get('/providers/demo-banks', response_model=list[DemoBank])
 async def demo_banks():
-    """Public — the fake banks the mock service currently offers."""
+    """Public — the fake banks the mock service currently offers.
+
+    30s timeout, not 5s: on a free-tier host the mock service can be asleep
+    and take ~20s to cold-start on the first request after it idles out.
+    """
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(f"{settings.mock_provider_base_url}/banks")
             resp.raise_for_status()
             return resp.json()
