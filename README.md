@@ -1,13 +1,13 @@
 # Financial Account Aggregation API
 
 A backend service that links multiple bank accounts through a single aggregator
-provider and serves a normalized view of accounts, balances and transactions —
+provider and serves a normalized view of accounts, balances and transactions,
 regardless of which underlying bank the data came from. It handles the messy
 parts (expired logins, slow or failing banks, duplicate data) so callers never
 have to.
 
 Read-only aggregation: no payments, no money movement. Real banks are not
-integrated directly — a **mock provider** stands in for a Plaid/Mono/Okra-style
+integrated directly, a **mock provider** stands in for a Plaid/Mono/Okra-style
 aggregator during development.
 
 **Stack:** FastAPI · PostgreSQL (SQLAlchemy 2 async + Alembic) · Redis · Kafka
@@ -46,7 +46,7 @@ uv run python -m app.scheduler            # periodic scheduler
 cd frontend && npm install && npm run dev # web UI   → http://localhost:5173
 ```
 
-A React + TypeScript client lives in [`frontend/`](frontend/) — dashboard, account
+A React + TypeScript client lives in [`frontend/`](frontend/), dashboard, account
 detail with transactions, the link flow, and settings. The API enables CORS for
 `http://localhost:5173` by default (`CORS_ALLOW_ORIGINS`).
 
@@ -57,7 +57,7 @@ All routes require a bearer token except `/auth/*` and `/health`.
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/auth/register` · `/auth/login` · `/auth/refresh` | JWT auth (access + refresh) |
-| POST | `/accounts/link` | Start linking — returns a link token |
+| POST | `/accounts/link` | Start linking, returns a link token |
 | POST | `/accounts/link/callback` | Complete the link; creates accounts + runs an initial sync |
 | GET | `/accounts` | List the caller's accounts |
 | GET | `/accounts/{id}/balance` | Cached balance |
@@ -71,10 +71,10 @@ All routes require a bearer token except `/auth/*` and `/health`.
 Each linked connection records which aggregator it uses (`linked_accounts.provider`),
 so **Plaid and demo banks can coexist**. Implementations live in `app/providers/`.
 
-- **demo banks** — [`mockbank/`](mockbank/), a standalone service (5 Ghanaian banks +
+- **demo banks**, [`mockbank/`](mockbank/), a standalone service (5 Ghanaian banks +
   a slow and a flaky one) whose ledgers grow on a timer, so syncs keep pulling fresh
   data. `GET /providers/demo-banks` lists them; the link modal offers them directly.
-- **Plaid** — set `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_COUNTRY_CODES`.
+- **Plaid**, set `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_COUNTRY_CODES`.
   When configured, the link modal also offers "Connect a real bank (Plaid)".
 
 `PROVIDER` is only the default for a link that doesn't specify one. Provider access
@@ -105,7 +105,7 @@ uv run pytest        # needs Postgres + Redis + the mock provider on :9000
 covers the enqueue → worker → result path; `tests/test_chaos.py` is the
 load/chaos test.
 
-**Chaos result** — 20 linked accounts synced concurrently for 3 rounds against
+**Chaos result**, 20 linked accounts synced concurrently for 3 rounds against
 a provider injecting ~10–15% `503`s:
 
 ```
