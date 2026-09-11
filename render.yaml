@@ -1,0 +1,50 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Two free web services: the API and the mockbank demo-bank service.
+# Postgres (Neon), Redis (Upstash), the frontend (Cloudflare Pages) and every
+# secret are set up outside this file — see the deploy notes in README.md.
+#
+# `sync: false` env vars are NOT stored here; Render will prompt for them the
+# first time you apply this blueprint, and you fill them in by hand in the
+# dashboard afterwards.
+services:
+  - type: web
+    name: faa-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Neon connection string, postgresql+asyncpg://... — see README
+      - key: DB_SSL_REQUIRE
+        value: "true"
+      - key: JWT_SECRET_KEY
+        sync: false # generate: python -c "import secrets; print(secrets.token_urlsafe(48))"
+      - key: ENCRYPTION_KEY
+        sync: false # generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      - key: REDIS_URL
+        sync: false # Upstash "rediss://..." TCP connection string
+      - key: CORS_ALLOW_ORIGINS
+        sync: false # your Cloudflare Pages URL, e.g. https://kudivault.pages.dev
+      - key: MOCK_PROVIDER_BASE_URL
+        sync: false # the faa-mockbank service's URL once it has deployed once
+      - key: PROVIDER
+        value: mock
+      - key: LOG_JSON
+        value: "true"
+
+  - type: web
+    name: faa-mockbank
+    runtime: docker
+    dockerfilePath: ./mockbank/Dockerfile
+    dockerContext: ./mockbank
+    plan: free
+    healthCheckPath: /banks
+    envVars:
+      # the image hardcodes port 9000; tell Render to route to it
+      - key: PORT
+        value: "9000"
+      - key: MOCKBANK_TICK_SECONDS
+        value: "1800"

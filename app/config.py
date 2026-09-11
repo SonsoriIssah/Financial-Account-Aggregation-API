@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     # Database
     sql_echo: bool = False
+    # set true for hosted Postgres (Neon, Supabase, ...) that requires TLS
+    db_ssl_require: bool = False
 
     # Logging
     log_level: str = "INFO"
